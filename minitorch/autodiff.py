@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Tuple
 
 from typing_extensions import Protocol
 
@@ -22,7 +22,12 @@ def central_difference(f: Any, *vals: Any, arg: int = 0, epsilon: float = 1e-6) 
     Returns:
         An approximation of $f'_i(x_0, \ldots, x_{n-1})$
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    l = list(vals)
+    l[arg] += epsilon
+    f_x_plus_h = f(*l)
+    l[arg] -= 2 * epsilon
+    f_x_moins_h = f(*l)
+    return (f_x_plus_h - f_x_moins_h) / (2 * epsilon)
 
 
 variable_count = 1
@@ -50,7 +55,7 @@ class Variable(Protocol):
         pass
 
 
-def topological_sort(variable: Variable) -> Iterable[Variable]:
+def topological_sort(variable: Variable) -> List[Variable]:
     """
     Computes the topological order of the computation graph.
 
@@ -60,7 +65,20 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
     Returns:
         Non-constant Variables in topological order starting from the right.
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    variables: List[Variable] = []
+    visited = set()
+
+    def _build_topological(v: Variable) -> None:
+        if v not in visited:
+            visited.add(v)
+            if not v.is_constant():
+                for e in v.parents:
+                    _build_topological(e)
+                variables.append(v)
+
+    _build_topological(variable)
+    variables.reverse()
+    return variables
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -74,7 +92,20 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    raise NotImplementedError("Need to include this file from past assignment.")
+    variables = topological_sort(variable)
+
+    scalar_deriv: Dict[Variable, Any] = dict()
+    scalar_deriv[variable] = deriv
+    for current_var in variables:
+        current_deriv = scalar_deriv[current_var]
+        if current_var.is_leaf():
+            current_var.accumulate_derivative(current_deriv)
+        else:
+            for v, d in current_var.chain_rule(current_deriv):
+                if v in scalar_deriv:
+                    scalar_deriv[v] += d
+                else:
+                    scalar_deriv[v] = d
 
 
 @dataclass
