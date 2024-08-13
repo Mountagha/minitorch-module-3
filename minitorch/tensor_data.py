@@ -43,7 +43,9 @@ def index_to_position(index: Index, strides: Strides) -> int:
         Position in storage
     """
 
-    return sum(i * s for i, s in zip(index, strides))
+    # return sum(i * s for i, s in zip(index, strides))
+    return np.dot(index, strides).sum()
+
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
