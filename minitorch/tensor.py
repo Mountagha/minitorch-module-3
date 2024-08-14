@@ -235,6 +235,11 @@ class Tensor:
 
     def __repr__(self) -> str:
         return self._tensor.to_string()
+    
+    def __hash__(self) -> int:
+        return hash(
+            (self._tensor.to_string(), self.unique_id)
+        )  # So that it can be used in a dict/set.
 
     def __getitem__(self, key: Union[int, UserIndex]) -> float:
         key2 = (key,) if isinstance(key, int) else key

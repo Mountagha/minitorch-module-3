@@ -42,10 +42,11 @@ def index_to_position(index: Index, strides: Strides) -> int:
     Returns:
         Position in storage
     """
-
     # return sum(i * s for i, s in zip(index, strides))
-    return np.dot(index, strides).sum()
-
+    pos = 0
+    for idx, stride in zip(index, strides):
+        pos += idx * stride
+    return pos
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -61,7 +62,15 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    strides = strides_from_shape(shape)
+    # strides = strides_from_shape(shape)
+    #numba having trouble when strides_from_shape is called here
+    # hence the inlining.
+    layout = [1]
+    offset = 1
+    for i in range(len(shape) - 1, -1, -1):
+        layout.append(shape[i] * offset)
+        offset = shape[i] * offset
+    strides = layout[:-1][::-1]
     pos = ordinal
     for i, stride in enumerate(strides):
         indice = pos // stride

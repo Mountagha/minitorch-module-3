@@ -25,6 +25,7 @@ treduce = minitorch.fast_ops.tensor_reduce(njit()(minitorch.operators.add))
 
 treduce(*out.tuple(), *a.tuple(), 0)
 print(treduce.parallel_diagnostics(level=3))
+"""
 
 
 # MM
@@ -38,3 +39,5 @@ tmm = minitorch.fast_ops.tensor_matrix_multiply
 
 tmm(*out.tuple(), *a.tuple(), *b.tuple())
 print(tmm.parallel_diagnostics(level=3))
+
+"""

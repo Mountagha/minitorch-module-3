@@ -11,6 +11,7 @@ from .tensor_data import (
     index_to_position,
     shape_broadcast,
     to_index,
+    strides_from_shape,
 )
 from .tensor_ops import MapProto, TensorOps
 
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
 # This code will JIT compile fast versions your tensor_data functions.
 # If you get an error, read the docs for NUMBA as to what is allowed
 # in these functions.
+# strides_from_shape = njit(inline="always")(strides_from_shape)
 to_index = njit(inline="always")(to_index)
 index_to_position = njit(inline="always")(index_to_position)
 broadcast_index = njit(inline="always")(broadcast_index)
@@ -159,8 +161,11 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-
-         for i in prange(int(np.prod(out_shape))):
+        if (out_strides == in_strides).all() and len(out) == len(in_storage):
+            for i in range(int(np.prod(out_shape))):
+                out[i] = fn(in_storage[i])
+            return
+        for i in prange(int(np.prod(out_shape))):
             # find both indexes for the in and the out.
             in_index: Index = np.zeros_like(in_shape, dtype=np.int32)
             out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
@@ -207,7 +212,11 @@ def tensor_zip(
         b_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        for i in range(int(np.prod(out_shape))):
+        if len(a_storage) == len(b_storage) and (a_strides == b_strides).all() and (b_strides == out_strides).all():
+            for i in prange(int(np.prod(out_shape))):
+                out[i] = fn(a_storage[i], b_storage[i])
+            return
+        for i in prange(int(np.prod(out_shape))):
             a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
             b_index: Index = np.zeros_like(b_shape, dtype=np.int32)
             out_index = np.zeros_like(out_shape, dtype=np.int32)
@@ -249,14 +258,13 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # TODO: Implement for Task 3.1.
         out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
         a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
         reduce_shape = np.ones_like(a_shape, dtype=np.int32)
         reduce_shape[reduce_dim] = a_shape[reduce_dim]
         reduce_size = int(a_shape[reduce_dim])
         out_size = int(np.prod(out_shape))
-        for i in range(out_size):
+        for i in prange(out_size):
             to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
 
