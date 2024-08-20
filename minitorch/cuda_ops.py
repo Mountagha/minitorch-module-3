@@ -361,6 +361,39 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     BLOCK_DIM = 32
     # TODO: Implement for Task 3.3.
     # raise NotImplementedError("Need to implement for Task 3.3")
+    dev_a = cuda.shared.array((BLOCK_DIM,BLOCK_DIM), numba.float32)
+    dev_b = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
+
+    # (x, y) can also be computed by calling cuda.grid(2)
+    x = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
+    y = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+
+    # local positions.
+    lx = cuda.threadIdx.x
+    ly = cuda.threadIdx.y
+
+    if x < out.shape[0] and y < out.shape[1]:
+
+        # each thread computes one element in the result matrix.
+        # the dot product is chunked into dot products of TPB-long vectors.
+        tmp_sum = 0.0
+        for i in range(cuda.gridDim.x):
+            # preload data into shared memory
+            dev_a[lx, ly] = a[x, ly + i * BLOCK_DIM]
+            dev_b[lx, ly] = b[lx + i * BLOCK_DIM, y]
+
+            # wait until all thread finish preloading
+            cuda.syncthreads()
+
+            # computes partial product on the shared memory
+            for j in range(BLOCK_DIM):
+                tmp_sum += dev_a[lx, j] * dev_b[j, ly]
+            
+            # wait until all threads finish computing
+            cuda.syncthreads()
+        out[x, y] = tmp_sum
+
+
 
 
 jit_mm_practice = cuda.jit()(_mm_practice)
@@ -407,6 +440,8 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
+    assert a_shape[-1] == b_shape[-2]
+
     a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
     # Batch dimension - fixed
@@ -424,13 +459,33 @@ def _tensor_matrix_multiply(
     pi = cuda.threadIdx.x
     pj = cuda.threadIdx.y
 
+    a_index = cuda.local.array(BLOCK_DIM, numba.int32)
+    b_index = cuda.local.array(BLOCK_DIM, numba.int32)
+    out_index = cuda.local.array(BLOCK_DIM, numba.int32)
+
+
     # Code Plan:
     # 1) Move across shared dimension by block dim.
     #    a) Copy into shared memory for a matrix.
     #    b) Copy into shared memory for b matrix
     #    c) Compute the dot produce for position c[i, j]
     # TODO: Implement for Task 3.4.
-    raise NotImplementedError("Need to implement for Task 3.4")
+    # raise NotImplementedError("Need to implement for Task 3.4")
+    if i < out_shape[-2] and j < out_shape[-1]:
+        tmp_sum = 0.0
+        o = i + j * cuda.gridDim.x * cuda.blockDim.x
+        to_index(o, out_shape, out_index)
+        # move across the shared dimension by block dim.
+        for idx in range(0, a_shape[-1], BLOCK_DIM):
+            to_index(i, a_shape, a_index)
+            to_index(j, b_shape, b_index)
+            a_shared[pi, pj] = a_storage[index_to_position(a_index, a_strides)]
+            b_shared[pi, pj] = b_storage[index_to_position(b_index, b_strides)]
+            cuda.syncthreads()
+            for k in range(BLOCK_DIM):
+                if (idx + k) < a_shape[-1]:
+                    tmp_sum += a_shared[pi, k] * b_shared[k, pj]
+        out[index_to_position(out_index, out_strides)] = tmp_sum
 
 
 tensor_matrix_multiply = cuda.jit(_tensor_matrix_multiply)
