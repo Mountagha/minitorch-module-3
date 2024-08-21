@@ -161,7 +161,7 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        if (out_strides == in_strides).all() and len(out) == len(in_storage):
+        if (out_strides == in_strides).all() and len(out) == len(in_storage) and (out_shape == in_shape).all():
             for i in prange(int(np.prod(out_shape))):
                 out[i] = fn(in_storage[i])
             return
@@ -210,21 +210,26 @@ def tensor_zip(
         b_strides: Strides,
     ) -> None:
         # TODO: Implement for Task 3.1.
-        if len(a_storage) == len(b_storage) and (a_strides == b_strides).all() and (b_strides == out_strides).all():
+        # if len(a_storage) == len(b_storage) and (a_strides == b_strides).all() and (b_strides == out_strides).all():
+        #    for i in prange(int(np.prod(out_shape))):
+        #        out[i] = fn(a_storage[i], b_storage[i])
+        #    return
+        if (len(out_strides) != len(a_strides) or len(out_strides) != len(b_strides) or (out_strides != a_strides).any() or (out_strides != b_strides).any() or (out_shape != a_shape).any() or (out_shape != b_shape).any()):
+            for i in prange(int(np.prod(out_shape))):
+                a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
+                b_index: Index = np.zeros_like(b_shape, dtype=np.int32)
+                out_index = np.zeros_like(out_shape, dtype=np.int32)
+                to_index(i, out_shape, out_index)
+                broadcast_index(out_index, out_shape, a_shape, a_index)
+                broadcast_index(out_index, out_shape, b_shape, b_index)
+                o = index_to_position(out_index, out_strides)
+                a = index_to_position(a_index, a_strides)
+                b = index_to_position(b_index, b_strides)
+                out[o] = fn(a_storage[a], b_storage[b])
+        else:
             for i in prange(int(np.prod(out_shape))):
                 out[i] = fn(a_storage[i], b_storage[i])
-            return
-        for i in prange(int(np.prod(out_shape))):
-            a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
-            b_index: Index = np.zeros_like(b_shape, dtype=np.int32)
-            out_index = np.zeros_like(out_shape, dtype=np.int32)
-            to_index(i, out_shape, out_index)
-            broadcast_index(out_index, out_shape, a_shape, a_index)
-            broadcast_index(out_index, out_shape, b_shape, b_index)
-            o = index_to_position(out_index, out_strides)
-            a = index_to_position(a_index, a_strides)
-            b = index_to_position(b_index, b_strides)
-            out[o] = fn(a_storage[a], b_storage[b])
+ 
     return njit(parallel=True)(_zip)  # type: ignore
 
 
