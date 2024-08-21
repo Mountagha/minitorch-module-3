@@ -62,15 +62,18 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    # strides = strides_from_shape(shape)
-    #numba having trouble when strides_from_shape is called here
+    strides = strides_from_shape(shape)
+    # numba having trouble when strides_from_shape is called here
     # hence the inlining.
-    layout = [1]
+    """
+    layout = np.zeros_like((len(shape), ), dtype=np.int32)
+    layout[0] = 1
     offset = 1
     for i in range(len(shape) - 1, -1, -1):
-        layout.append(shape[i] * offset)
+        layout[i] = shape[i] * offset
         offset = shape[i] * offset
     strides = layout[:-1][::-1]
+    """
     pos = ordinal
     for i, stride in enumerate(strides):
         indice = pos // stride
@@ -136,12 +139,11 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
-    layout = [1]
-    offset = 1
-    for s in reversed(shape):
-        layout.append(s * offset)
-        offset = s * offset
-    return tuple(reversed(layout[:-1]))
+    layout = np.ones_like(shape, dtype=np.int32)
+    layout[-1] = 1 # set the last stride as 1 (innermost dimension)
+    for i in range(len(shape) -2, -1, -1):
+        layout[i] = layout[i + 1] * shape[i + 1]
+    return tuple(layout)
 
 
 class TensorData:

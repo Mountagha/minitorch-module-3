@@ -13,7 +13,7 @@
             "args": [
                 "${workspaceFolder}/tests/test_tensor_general.py",
                 "-k",
-                "test_mm2",
+                "test_one_args",
             ],
             "env": {
                 "NUMBA_DISABLE_JIT":"1"

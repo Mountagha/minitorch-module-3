@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # This code will JIT compile fast versions your tensor_data functions.
 # If you get an error, read the docs for NUMBA as to what is allowed
 # in these functions.
-# strides_from_shape = njit(inline="always")(strides_from_shape)
+strides_from_shape = njit(inline="always")(strides_from_shape)
 to_index = njit(inline="always")(to_index)
 index_to_position = njit(inline="always")(index_to_position)
 broadcast_index = njit(inline="always")(broadcast_index)
@@ -162,7 +162,7 @@ def tensor_map(
         in_strides: Strides,
     ) -> None:
         if (out_strides == in_strides).all() and len(out) == len(in_storage):
-            for i in range(int(np.prod(out_shape))):
+            for i in prange(int(np.prod(out_shape))):
                 out[i] = fn(in_storage[i])
             return
         for i in prange(int(np.prod(out_shape))):
@@ -171,9 +171,7 @@ def tensor_map(
             out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
-            j = index_to_position(in_index, in_strides)
-            k = index_to_position(out_index, out_strides)
-            out[k] = fn(in_storage[j])
+            out[index_to_position(out_index, out_strides)] = fn(in_storage[index_to_position(in_index, in_strides)])
 
     return njit(parallel=True)(_map)  # type: ignore
 
