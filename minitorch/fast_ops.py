@@ -268,16 +268,17 @@ def tensor_reduce(
         reduce_size = int(a_shape[reduce_dim])
         out_size = int(np.prod(out_shape))
         for i in prange(out_size):
+            out_index = np.empty(MAX_DIMS, dtype=np.int32)
+            dim = a_shape[reduce_dim]
             to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
-
-            for j in range(reduce_size):
-                to_index(j, reduce_shape, a_index)
-                for k in range(len(reduce_shape)):
-                    if reduce_shape[k] != 1:
-                        out_index[k] = a_index[k]
-                l = index_to_position(out_index, a_strides)
-                out[o] = fn(out[o], a_storage[l])
+            accum = out[o]
+            j = index_to_position(out_index, a_strides)
+            st = a_strides[reduce_dim]
+            for s in range(reduce_size):
+                accum = fn(accum, a_storage[j])
+                j += st
+            out[o] = accum
 
     return njit(parallel=True)(_reduce)  # type: ignore
 
