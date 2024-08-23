@@ -328,6 +328,7 @@ def _tensor_matrix_multiply(
     # b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
     assert a_shape[-1] == b_shape[-2]
+    # out_index = np.zeros_like(out_shape, dtype=np.int32)
     out_index = np.zeros_like(out_shape, dtype=np.int32)
     for i in prange(len(out)):
         to_index(i, out_shape, out_index)
@@ -335,6 +336,7 @@ def _tensor_matrix_multiply(
         # since a and out got similar indices except for the last axis
         # which will be iterated over.
         a_index = np.copy(out_index)
+        a_index[-1] = 0
         b_index = np.zeros_like(b_shape, dtype=np.int32)
         # last axis of out corresponds to the last axis of b. hence,
         b_index[-1] = out_index[-1]
