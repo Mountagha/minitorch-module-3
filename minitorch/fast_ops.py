@@ -324,12 +324,15 @@ def _tensor_matrix_multiply(
     Returns:
         None : Fills in `out`
     """
-    # a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
-    # b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
+    a_batch_stride = a_strides[0] if a_shape[0] > 1 else 0
+    b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
     assert a_shape[-1] == b_shape[-2]
     # out_index = np.zeros_like(out_shape, dtype=np.int32)
     out_index = np.zeros_like(out_shape, dtype=np.int32)
+    a_index = np.zeros_like(a_shape, dtype=np.int32)
+    b_index = np.zeros_like(b_shape, dtype=np.int32)
+    """
     for i in prange(len(out)):
         to_index(i, out_shape, out_index)
         o = index_to_position(out_index, out_strides)
@@ -347,5 +350,23 @@ def _tensor_matrix_multiply(
             tmp_sum += a_storage[index_to_position(a_index, a_strides)] * \
                    b_storage[index_to_position(b_index, b_strides)]
         out[o] = tmp_sum
+    """
+    for n in prange(out_shape[0]):
+        # We then loop through the 1th dimension of a
+        for i in prange(out_shape[1]):
+            # And loop through the 2th dimension of b
+            for j in prange(out_shape[2]):
+                # We get the absolute positions in a_storage and b_storage by multiplying the indices with the strides
+                a_idx = n * a_batch_stride + i * a_strides[1]
+                b_idx = n * b_batch_stride + j * b_strides[2]
+                accum = 0.0
+                # We use the variable accum to store the inner product of matrices a and b while looping through the common dimension k which is the 2th dimension of a and the 1th dimension of b
+                for k in range(a_shape[2]):
+                    accum += a_storage[a_idx] * b_storage[b_idx]
+                    # We update the position for both a and b in their common dimension (2th for a and 1th for b) with the help of the strides
+                    a_idx += a_strides[2]
+                    b_idx += b_strides[1]
+                # We calculate the absolute position in out by multiplying the strides with the indices
+                out[n * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = accum
 
 tensor_matrix_multiply = njit(parallel=True, fastmath=True)(_tensor_matrix_multiply)
