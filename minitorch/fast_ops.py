@@ -328,11 +328,11 @@ def _tensor_matrix_multiply(
     b_batch_stride = b_strides[0] if b_shape[0] > 1 else 0
 
     assert a_shape[-1] == b_shape[-2]
+    """
     # out_index = np.zeros_like(out_shape, dtype=np.int32)
     out_index = np.zeros_like(out_shape, dtype=np.int32)
     a_index = np.zeros_like(a_shape, dtype=np.int32)
     b_index = np.zeros_like(b_shape, dtype=np.int32)
-    """
     for i in prange(len(out)):
         to_index(i, out_shape, out_index)
         o = index_to_position(out_index, out_strides)
