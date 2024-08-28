@@ -12,6 +12,8 @@
             "console": "integratedTerminal",
             "args": [
                 "${workspaceFolder}/tests/test_tensor_general.py",
+                "-m",
+                "task3_3",
                 "-k",
                 "test_one_derivative",
                 "--maxfail=1",
