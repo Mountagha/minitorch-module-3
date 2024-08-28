@@ -156,7 +156,6 @@ def tensor_map(
         i = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         if i < out_size:
             to_index(i, out_shape, out_index)
-            to_index(i, in_index, in_shape)
             broadcast_index(out_index, out_shape, in_shape, in_index)
             out[index_to_position(out_index, out_strides)] =    \
                 fn(in_storage[index_to_position(in_index, in_strides)])
@@ -206,15 +205,9 @@ def tensor_zip(
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, a_shape, a_index)
             broadcast_index(out_index, out_shape, b_shape, b_index)
-            # to_index(i, a_shape, a_index)
-            # to_index(i, b_shape, a_index)
-            out[index_to_position(out_index, out_strides)] = fn(
-                a_storage[index_to_position(a_index, a_strides)],
-                b_storage[index_to_position(b_index, b_strides)]
-            )
-
-        # TODO: Implement for Task 3.3.
-        # raise NotImplementedError("Need to implement for Task 3.3")
+            a_data = a_storage[index_to_position(a_index, a_strides)]
+            b_data = b_storage[index_to_position(b_index, b_strides)]
+            out[index_to_position(out_index, out_strides)] = fn(a_data, b_data)
 
     return cuda.jit()(_zip)  # type: ignore
 
@@ -329,7 +322,7 @@ def tensor_reduce(
                 cuda.syncthreads()
 
                 stride = 1
-                while stride < cuda.blockDim.x: 
+                while stride < BLOCK_DIM: 
                     if pos % (2 * stride) == 0:
                         cache[pos] = fn(cache[pos], cache[pos + stride])
                         cuda.syncthreads()

@@ -268,10 +268,11 @@ def tensor_map(fn: Callable[[float], float]) -> Any:
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
+        in_index: Index = np.zeros_like(in_shape, dtype=np.int32)
+        out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
+
         for i in range(int(np.prod(out_shape))):
             # find both indexes for the in and the out.
-            in_index: Index = np.zeros_like(in_shape, dtype=np.int32)
-            out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
             j = index_to_position(in_index, in_strides)

@@ -69,8 +69,8 @@ def topological_sort(variable: Variable) -> List[Variable]:
     visited = set()
 
     def _build_topological(v: Variable) -> None:
-        if v not in visited:
-            visited.add(v)
+        if v.unique_id not in visited:
+            visited.add(v.unique_id)
             if not v.is_constant():
                 for e in v.parents:
                     _build_topological(e)
@@ -94,19 +94,18 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
     """
     variables = topological_sort(variable)
 
-    scalar_deriv: Dict[Variable, Any] = dict()
-    scalar_deriv[variable] = deriv
+    scalar_deriv: Dict[int, Any] = dict()
+    scalar_deriv[variable.unique_id] = deriv
     for current_var in variables:
-        current_deriv = scalar_deriv[current_var]
+        current_deriv = scalar_deriv[current_var.unique_id]
         if current_var.is_leaf():
             current_var.accumulate_derivative(current_deriv)
         else:
             for v, d in current_var.chain_rule(current_deriv):
-                if v in scalar_deriv:
-                    scalar_deriv[v] += d
+                if v.unique_id in scalar_deriv:
+                    scalar_deriv[v.unique_id] += d
                 else:
-                    scalar_deriv[v] = d
-
+                    scalar_deriv[v.unique_id] = d
 
 @dataclass
 class Context:
