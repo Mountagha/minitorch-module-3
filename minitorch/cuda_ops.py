@@ -243,7 +243,7 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
     # raise NotImplementedError("Need to implement for Task 3.3")
     # copy elements from a array to the shared memory
     if i < size:
-        cache[pos] = a[i]
+        cache[pos] = float(a[i])
     else:
         cache[pos] = 0.0 # handling threads that don't have valid data.
     cuda.syncthreads()
@@ -365,38 +365,32 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     """
     BLOCK_DIM = 32
     # TODO: Implement for Task 3.3.
-    # raise NotImplementedError("Need to implement for Task 3.3")
-    dev_a = cuda.shared.array((BLOCK_DIM,BLOCK_DIM), numba.float32)
-    dev_b = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float32)
-
-    # (x, y) can also be computed by calling cuda.grid(2)
-    x = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
-    y = cuda.blockIdx.y * cuda.blockDim.y + cuda.threadIdx.y
+    dev_a = cuda.shared.array((BLOCK_DIM,BLOCK_DIM), numba.float64)
+    dev_b = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
 
     # local positions.
     lx = cuda.threadIdx.x
     ly = cuda.threadIdx.y
 
-    if x < out.shape[0] and y < out.shape[1]:
+    if lx < size and ly < size:
 
         # each thread computes one element in the result matrix.
         # the dot product is chunked into dot products of TPB-long vectors.
         tmp_sum = 0.0
-        for i in range(cuda.gridDim.x):
-            # preload data into shared memory
-            dev_a[lx, ly] = a[x, ly + i * BLOCK_DIM]
-            dev_b[lx, ly] = b[lx + i * BLOCK_DIM, y]
+        # preload data into shared memory
+        dev_a[lx, ly] = a[size * lx + ly]
+        dev_b[lx, ly] = b[size * lx + ly]
 
-            # wait until all thread finish preloading
-            cuda.syncthreads()
+        # wait until all thread finish preloading
+        cuda.syncthreads()
 
-            # computes partial product on the shared memory
-            for j in range(BLOCK_DIM):
-                tmp_sum += dev_a[lx, j] * dev_b[j, ly]
-            
-            # wait until all threads finish computing
-            cuda.syncthreads()
-        out[x, y] = tmp_sum
+        # computes partial product on the shared memory
+        for j in range(size):
+            tmp_sum += dev_a[lx, j] * dev_b[j, ly]
+        
+        # wait until all threads finish computing
+        cuda.syncthreads()
+        out[size * lx + ly] = tmp_sum
 
 
 
@@ -476,6 +470,7 @@ def _tensor_matrix_multiply(
     #    c) Compute the dot produce for position c[i, j]
     # TODO: Implement for Task 3.4.
     # raise NotImplementedError("Need to implement for Task 3.4")
+    """
     if i < out_shape[-2] and j < out_shape[-1]:
         tmp_sum = 0.0
         o = i + j * cuda.gridDim.x * cuda.blockDim.x
@@ -491,6 +486,29 @@ def _tensor_matrix_multiply(
                 if (idx + k) < a_shape[-1]:
                     tmp_sum += a_shared[pi, k] * b_shared[k, pj]
         out[index_to_position(out_index, out_strides)] = tmp_sum
-
+    """
+    # Need to understand this code better later.
+    accum = 0.0
+    for idx in range(0, a_shape[2], BLOCK_DIM):
+        # We get the absolute value of the index with respect to all of the blocks
+        k = idx + pj
+        # i and k must be within the shape. a has shape [batch, i, k]
+        if i < a_shape[1] and k < a_shape[2]:
+            # We get the absolute value in a_storage by multiplying the batch dimension and indices with the strides
+            a_shared[pi, pj] = a_storage[a_batch_stride * batch + a_strides[1] * i + a_strides[2] * k]
+        k = idx + pi
+        # j and k must be within the shape. b has shape [batch, k, j]
+        if j < b_shape[2] and k < b_shape[1]:
+            # Getting absolute value in b_storage by multiplying the batch dimension and indices with the strides
+            b_shared[pi, pj] = b_storage[b_batch_stride * batch + b_strides[2] * j + b_strides[1] * k]
+        # After writing to shared arrays we need to sync the threads
+        cuda.syncthreads()
+        for k in range(BLOCK_DIM):
+            if( idx + k ) < a_shape[2]:
+                accum += a_shared[pi, k] * b_shared[k, pj]
+    # We need to make sure i and j are within shape. out has shape [batch, i , j]
+    if i < out_shape[1] and j < out_shape[2]:
+        # We find the absolute position in out storage by multiplying the strides with the batch dimension and the indices and set it to accum
+        out[out_strides[0] * batch + out_strides[1] * i + out_strides[2] * j] = accum
 
 tensor_matrix_multiply = cuda.jit(_tensor_matrix_multiply)
