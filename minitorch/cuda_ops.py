@@ -1,6 +1,5 @@
 from typing import Callable, Optional
 
-import numpy as np
 import numba
 from numba import cuda
 
@@ -157,8 +156,9 @@ def tensor_map(
         if i < out_size:
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
-            out[index_to_position(out_index, out_strides)] =    \
-                fn(in_storage[index_to_position(in_index, in_strides)])
+            out[index_to_position(out_index, out_strides)] = fn(
+                in_storage[index_to_position(in_index, in_strides)]
+            )
 
         # TODO: Implement for Task 3.3.
         # raise NotImplementedError("Need to implement for Task 3.3")
@@ -245,7 +245,7 @@ def _sum_practice(out: Storage, a: Storage, size: int) -> None:
     if i < size:
         cache[pos] = float(a[i])
     else:
-        cache[pos] = 0.0 # handling threads that don't have valid data.
+        cache[pos] = 0.0  # handling threads that don't have valid data.
     cuda.syncthreads()
 
     # Perform // reductions to sum blockDim elements.
@@ -303,11 +303,7 @@ def tensor_reduce(
         cache = cuda.shared.array(BLOCK_DIM, numba.float64)
         out_index = cuda.local.array(MAX_DIMS, numba.int32)
         out_pos = cuda.blockIdx.x
-        global_pos = cuda.blockIdx.x * cuda.blockDim.x + cuda.threadIdx.x
         pos = cuda.threadIdx.x
-        # reduce_shape = np.ones_like(a_shape, dtype=np.int32)
-        # reduce_shape[reduce_dim] = a_shape[reduce_dim]
-        # reduce_size = int(a_shape[reduce_dim])
 
         cache[pos] = reduce_value
 
@@ -322,7 +318,7 @@ def tensor_reduce(
                 cuda.syncthreads()
 
                 stride = 1
-                while stride < BLOCK_DIM: 
+                while stride < BLOCK_DIM:
                     if pos % (2 * stride) == 0:
                         cache[pos] = fn(cache[pos], cache[pos + stride])
                         cuda.syncthreads()
@@ -365,7 +361,7 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
     """
     BLOCK_DIM = 32
     # TODO: Implement for Task 3.3.
-    dev_a = cuda.shared.array((BLOCK_DIM,BLOCK_DIM), numba.float64)
+    dev_a = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
     dev_b = cuda.shared.array((BLOCK_DIM, BLOCK_DIM), numba.float64)
 
     # local positions.
@@ -387,12 +383,10 @@ def _mm_practice(out: Storage, a: Storage, b: Storage, size: int) -> None:
         # computes partial product on the shared memory
         for j in range(size):
             tmp_sum += dev_a[lx, j] * dev_b[j, ly]
-        
+
         # wait until all threads finish computing
         cuda.syncthreads()
         out[size * lx + ly] = tmp_sum
-
-
 
 
 jit_mm_practice = cuda.jit()(_mm_practice)
@@ -458,10 +452,9 @@ def _tensor_matrix_multiply(
     pi = cuda.threadIdx.x
     pj = cuda.threadIdx.y
 
-    a_index = cuda.local.array(BLOCK_DIM, numba.int32)
-    b_index = cuda.local.array(BLOCK_DIM, numba.int32)
-    out_index = cuda.local.array(BLOCK_DIM, numba.int32)
-
+    # a_index = cuda.local.array(BLOCK_DIM, numba.int32)
+    # b_index = cuda.local.array(BLOCK_DIM, numba.int32)
+    # out_index = cuda.local.array(BLOCK_DIM, numba.int32)
 
     # Code Plan:
     # 1) Move across shared dimension by block dim.
@@ -487,7 +480,7 @@ def _tensor_matrix_multiply(
                     tmp_sum += a_shared[pi, k] * b_shared[k, pj]
         out[index_to_position(out_index, out_strides)] = tmp_sum
     """
-    # Need to understand this code better later.
+    # Need to understand this code better later. Well rested.
     accum = 0.0
     for idx in range(0, a_shape[2], BLOCK_DIM):
         # We get the absolute value of the index with respect to all of the blocks
@@ -495,20 +488,25 @@ def _tensor_matrix_multiply(
         # i and k must be within the shape. a has shape [batch, i, k]
         if i < a_shape[1] and k < a_shape[2]:
             # We get the absolute value in a_storage by multiplying the batch dimension and indices with the strides
-            a_shared[pi, pj] = a_storage[a_batch_stride * batch + a_strides[1] * i + a_strides[2] * k]
+            a_shared[pi, pj] = a_storage[
+                a_batch_stride * batch + a_strides[1] * i + a_strides[2] * k
+            ]
         k = idx + pi
         # j and k must be within the shape. b has shape [batch, k, j]
         if j < b_shape[2] and k < b_shape[1]:
             # Getting absolute value in b_storage by multiplying the batch dimension and indices with the strides
-            b_shared[pi, pj] = b_storage[b_batch_stride * batch + b_strides[2] * j + b_strides[1] * k]
+            b_shared[pi, pj] = b_storage[
+                b_batch_stride * batch + b_strides[2] * j + b_strides[1] * k
+            ]
         # After writing to shared arrays we need to sync the threads
         cuda.syncthreads()
         for k in range(BLOCK_DIM):
-            if( idx + k ) < a_shape[2]:
+            if (idx + k) < a_shape[2]:
                 accum += a_shared[pi, k] * b_shared[k, pj]
     # We need to make sure i and j are within shape. out has shape [batch, i , j]
     if i < out_shape[1] and j < out_shape[2]:
         # We find the absolute position in out storage by multiplying the strides with the batch dimension and the indices and set it to accum
         out[out_strides[0] * batch + out_strides[1] * i + out_strides[2] * j] = accum
+
 
 tensor_matrix_multiply = cuda.jit(_tensor_matrix_multiply)

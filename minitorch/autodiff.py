@@ -107,6 +107,7 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
                 else:
                     scalar_deriv[v.unique_id] = d
 
+
 @dataclass
 class Context:
     """

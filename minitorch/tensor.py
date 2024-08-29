@@ -235,7 +235,7 @@ class Tensor:
 
     def __repr__(self) -> str:
         return self._tensor.to_string()
-    
+
     def __hash__(self) -> int:
         return hash(
             (self._tensor.to_string(), self.unique_id)

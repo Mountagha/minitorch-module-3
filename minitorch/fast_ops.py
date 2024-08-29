@@ -10,8 +10,8 @@ from .tensor_data import (
     broadcast_index,
     index_to_position,
     shape_broadcast,
-    to_index,
     strides_from_shape,
+    to_index,
 )
 from .tensor_ops import MapProto, TensorOps
 
@@ -161,7 +161,11 @@ def tensor_map(
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        if (out_strides == in_strides).all() and len(out) == len(in_storage) and (out_shape == in_shape).all():
+        if (
+            (out_strides == in_strides).all()
+            and len(out) == len(in_storage)
+            and (out_shape == in_shape).all()
+        ):
             for i in prange(int(np.prod(out_shape))):
                 out[i] = fn(in_storage[i])
             return
@@ -171,7 +175,9 @@ def tensor_map(
             out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
             to_index(i, out_shape, out_index)
             broadcast_index(out_index, out_shape, in_shape, in_index)
-            out[index_to_position(out_index, out_strides)] = fn(in_storage[index_to_position(in_index, in_strides)])
+            out[index_to_position(out_index, out_strides)] = fn(
+                in_storage[index_to_position(in_index, in_strides)]
+            )
 
     return njit(parallel=True)(_map)  # type: ignore
 
@@ -214,7 +220,14 @@ def tensor_zip(
         #    for i in prange(int(np.prod(out_shape))):
         #        out[i] = fn(a_storage[i], b_storage[i])
         #    return
-        if (len(out_strides) != len(a_strides) or len(out_strides) != len(b_strides) or (out_strides != a_strides).any() or (out_strides != b_strides).any() or (out_shape != a_shape).any() or (out_shape != b_shape).any()):
+        if (
+            len(out_strides) != len(a_strides)
+            or len(out_strides) != len(b_strides)
+            or (out_strides != a_strides).any()
+            or (out_strides != b_strides).any()
+            or (out_shape != a_shape).any()
+            or (out_shape != b_shape).any()
+        ):
             for i in prange(int(np.prod(out_shape))):
                 a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
                 b_index: Index = np.zeros_like(b_shape, dtype=np.int32)
@@ -229,7 +242,7 @@ def tensor_zip(
         else:
             for i in prange(int(np.prod(out_shape))):
                 out[i] = fn(a_storage[i], b_storage[i])
- 
+
     return njit(parallel=True)(_zip)  # type: ignore
 
 
@@ -262,14 +275,12 @@ def tensor_reduce(
         reduce_dim: int,
     ) -> None:
         out_index: Index = np.zeros_like(out_shape, dtype=np.int32)
-        a_index: Index = np.zeros_like(a_shape, dtype=np.int32)
         reduce_shape = np.ones_like(a_shape, dtype=np.int32)
         reduce_shape[reduce_dim] = a_shape[reduce_dim]
         reduce_size = int(a_shape[reduce_dim])
         out_size = int(np.prod(out_shape))
         for i in prange(out_size):
             out_index = np.empty(MAX_DIMS, dtype=np.int32)
-            dim = a_shape[reduce_dim]
             to_index(i, out_shape, out_index)
             o = index_to_position(out_index, out_strides)
             accum = out[o]
@@ -367,6 +378,9 @@ def _tensor_matrix_multiply(
                     a_idx += a_strides[2]
                     b_idx += b_strides[1]
                 # We calculate the absolute position in out by multiplying the strides with the indices
-                out[n * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = accum
+                out[n * out_strides[0] + i * out_strides[1] + j * out_strides[2]] = (
+                    accum
+                )
+
 
 tensor_matrix_multiply = njit(parallel=True, fastmath=True)(_tensor_matrix_multiply)

@@ -62,9 +62,9 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    pos = ordinal + 0 # cause otherwise we can't njit this code
+    pos = ordinal + 0  # cause otherwise we can't njit this code
     # because numba does not allow variable overwriting into the loop
-    # and pos = ordinal seems like we are overwriting ordinal which is 
+    # and pos = ordinal seems like we are overwriting ordinal which is
     # not the case.
     for i in range(len(shape) - 1, -1, -1):
         out_index[i] = int(pos % shape[i])
