@@ -1,4 +1,5 @@
 import random
+import time
 
 import numba
 
@@ -30,7 +31,9 @@ class Network(minitorch.Module):
 
     def forward(self, x):
         # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+        x = self.layer1.forward(x).relu()
+        x = self.layer2.forward(x).relu()
+        return self.layer3.forward(x).sigmoid()
 
 
 class Linear(minitorch.Module):
@@ -44,7 +47,12 @@ class Linear(minitorch.Module):
 
     def forward(self, x):
         # TODO: Implement for Task 3.5.
-        raise NotImplementedError("Need to implement for Task 3.5")
+        # let's make the common dimension of x (x.shape[-1]) and
+        # w (weights.shape[-2]) aligned so that we can broadcast.
+        x = x.view(*x.shape, 1)
+        w = self.weights.value.view(1, *self.weights.value.shape)
+        b = self.bias.value.view(1, self.out_size)
+        return (x * w).sum(1).view(x.shape[0], self.out_size) + b
 
 
 class FastTrain:
@@ -66,6 +74,7 @@ class FastTrain:
         BATCH = 10
         losses = []
 
+        start_time = time.time()
         for epoch in range(max_epochs):
             total_loss = 0.0
             c = list(zip(data.X, data.y))
@@ -97,6 +106,9 @@ class FastTrain:
                 y2 = minitorch.tensor(data.y)
                 correct = int(((out.detach() > 0.5) == y2).sum()[0])
                 log_fn(epoch, total_loss, correct, losses)
+        end_time = time.time()
+        backend = "CPU" if self.backend == FastTensorBackend else "GPU"
+        print(f"{backend} Time: {end_time - start_time:.6f} seconds.")
 
 
 if __name__ == "__main__":
